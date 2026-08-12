@@ -70,6 +70,7 @@ def _run_trial(
     trial_idx: int,
 ):
     """Run one independent trial; module scope keeps it process-pickleable."""
+    trial_start_time = time.perf_counter()
     obs_rng = np.random.default_rng(2000 + trial_idx)
     engine_rng = np.random.default_rng(3000 + trial_idx)
     gt_poses, controls = gt_track
@@ -88,6 +89,7 @@ def _run_trial(
         "avg_weight_err": np.zeros(config.num_steps + 1),
         "num_hypotheses": np.zeros(config.num_steps + 1),
         "step_time": np.zeros(config.num_steps),
+        "trial_time": np.zeros(1),
         "est_trajectories": np.zeros((config.num_steps + 1, 3)),
     }
 
@@ -137,6 +139,7 @@ def _run_trial(
             engine.hypotheses
         )
 
+    result["trial_time"][0] = time.perf_counter() - trial_start_time
     return mode, trial_idx, result
 
 class ExperimentRunner:
@@ -189,6 +192,7 @@ class ExperimentRunner:
                 "avg_weight_err": np.zeros((self.config.num_trials, self.config.num_steps + 1)),
                 "num_hypotheses": np.zeros((self.config.num_trials, self.config.num_steps + 1)),
                 "step_time": np.zeros((self.config.num_trials, self.config.num_steps)),
+                "trial_time": np.zeros((self.config.num_trials, 1)),
                 "est_trajectories": np.zeros((self.config.num_trials, self.config.num_steps + 1, 3)),
             }
 

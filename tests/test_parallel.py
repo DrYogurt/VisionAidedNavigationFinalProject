@@ -29,7 +29,7 @@ class TestParallelExperiments(unittest.TestCase):
 
         for mode in modes:
             for metric in serial[mode]:
-                if metric == "step_time":
+                if metric in {"step_time", "trial_time"}:
                     continue
                 np.testing.assert_array_equal(
                     serial[mode][metric], parallel[mode][metric]

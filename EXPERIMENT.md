@@ -29,8 +29,11 @@ belief, and should be interpreted accordingly. At every observation, candidate
 associations are scored using the geometric measurement likelihood, the
 visibility/observation model, and—when enabled—the semantic likelihood. The
 resulting components are normalized and pruned using the paper-style
-maximum-weight ratio of 150. Classes of objects that have not yet been observed
-under a DA hypothesis remain collapsed under their uniform prior.
+maximum-weight ratio of 150, followed by a documented top-100 beam cap. Within
+one time step, DA assignments are constrained to be injective because the
+simulator produces at most one detection per physical object. Classes of
+objects that have not yet been observed under a DA hypothesis remain collapsed
+under their uniform prior.
 
 The active method uses a viewpoint-dependent classifier. For $M=2$, its mean
 semantic observation follows the paper's Equation 18, including the intended
@@ -63,7 +66,7 @@ scaling. Results are stratified by $M$ for both methods.
 # Results
 
 Corrected numerical results are pending a complete rerun of the experiment.
-They must not be replaced by values from the repository's existing v1--v6
+They must not be replaced by values from the repository's existing v1--v7
 artifacts: those legacy runs used a mathematically different formulation,
 including ground-truth class initialization and an incompatible semantic model.
 Consequently, their plotted errors, hypothesis counts, and runtime measurements

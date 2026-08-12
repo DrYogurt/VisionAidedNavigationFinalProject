@@ -144,6 +144,12 @@ class SemanticSLAMEngine:
 
             for comp, beta_prefix in working:
                 for beta_k in candidate_betas:
+                    # A time-step observation set contains at most one
+                    # detection per physical object, so beta_k is injective.
+                    # Enforcing this removes impossible duplicate assignments
+                    # and reduces N^n_k candidates to permutations.
+                    if beta_k in beta_prefix:
+                        continue
                     assigned_class = comp.class_assignments[beta_k]
                     if self.mode == "geometric_only":
                         class_options = [(assigned_class, 1.0)]

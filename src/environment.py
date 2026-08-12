@@ -18,7 +18,7 @@ class EnvironmentConfig:
     num_steps: int = 10            # T: Time steps per trajectory
     num_samples: int = 1000        # Ns: Pose samples per step for weight calculation
     pruning_ratio: float = 150.0   # Threshold tau = w_max / pruning_ratio for pruning
-    max_hypotheses: Optional[int] = None # Optional beam cap; None follows the paper's threshold-only pruning
+    max_hypotheses: Optional[int] = 100 # Beam cap applied after relative-weight pruning
     semantic_alpha: float = 0.25   # Paper Eq. (18) viewpoint-dependence strength
     semantic_k: float = 15.0       # Paper semantic precision parameter K
 

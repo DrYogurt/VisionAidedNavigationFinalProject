@@ -28,7 +28,7 @@ def configure_hyperparameters(
     num_steps: int = 10,
     num_samples: int = 1000,
     pruning_ratio: float = 150.0,
-    max_hypotheses: Optional[int] = None,
+    max_hypotheses: Optional[int] = 100,
     semantic_alpha: float = 0.25,
     semantic_k: float = 15.0,
     sensor_range: float = 6.0,
@@ -353,8 +353,8 @@ def main():
     parser.add_argument("--num-objects", type=int, default=6, help="Number of objects N (Default: 6)")
     parser.add_argument("--num-samples", type=int, default=1000, help="Pose samples Ns for weight calculation (Default: 1000)")
     parser.add_argument("--pruning-ratio", type=float, default=150.0, help="Pruning ratio threshold max_w / ratio (Default: 150.0)")
-    parser.add_argument("--max-hypotheses", type=int, default=None,
-                        help="Optional beam cap. Omit for paper-style threshold-only pruning.")
+    parser.add_argument("--max-hypotheses", type=int, default=100,
+                        help="Beam cap after relative-weight pruning (Default: 100). Use 0 to disable.")
     parser.add_argument("--semantic-alpha", type=float, default=0.25,
                         help="Viewpoint dependence alpha from paper Eq. (18).")
     parser.add_argument("--semantic-k", type=float, default=15.0,
@@ -372,6 +372,8 @@ def main():
         parser.error("matplotlib is required; install dependencies with 'python -m pip install -r requirements.txt'")
     if args.workers < 1:
         parser.error("--workers must be at least one")
+    if args.max_hypotheses == 0:
+        args.max_hypotheses = None
 
     print(f"=== Multi-Class Semantic SLAM Study ({args.num_environments} Unique Envs x {args.trials} Trials) ===")
 
@@ -392,8 +394,8 @@ def main():
     )
 
     # 1. Run multi-environment study across 20 environments and M in [1, 2, 3, 4, 5]
-    print("Starting paper-compatible multi-class experiment suite (v7.0.0)")
-    print("Results will be versioned and cached in results/data_v7")
+    print("Starting bounded multi-class experiment suite (v8.0.0)")
+    print("Results will be versioned and cached in results/data_v8")
 
     multi_env_data = ExperimentRunner.run_multi_environment_study(
         base_config=config,
@@ -411,7 +413,7 @@ def main():
     plot_metrics_per_m(multi_env_data, output_dir)
     plot_trajectories_for_each_m(multi_env_data, output_dir)
 
-    print(f"\nExecution complete! Versioned raw data saved to 'results/data_v7/'. Artifacts written to: {output_dir}")
+    print(f"\nExecution complete! Versioned raw data saved to 'results/data_v8/'. Artifacts written to: {output_dir}")
 
 if __name__ == "__main__":
     main()

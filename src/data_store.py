@@ -13,9 +13,9 @@ class VersionedDataStore:
     Stores raw metrics, environment layouts, and metadata to prevent re-running completed tests.
     """
 
-    VERSION = "v7.0.0"
+    VERSION = "v8.0.0"
 
-    def __init__(self, base_dir: str = "results/data_v7"):
+    def __init__(self, base_dir: str = "results/data_v8"):
         self.base_dir = os.path.abspath(base_dir)
         os.makedirs(self.base_dir, exist_ok=True)
 

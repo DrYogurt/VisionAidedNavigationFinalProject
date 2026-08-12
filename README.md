@@ -31,15 +31,24 @@ so memory use grows approximately linearly with the worker count. Use
 thread-limit environment variables prevent each process from starting its own
 pool of BLAS threads.
 
-Omitting `--max-hypotheses` uses the paper's threshold-only pruning. Setting it
-enables an explicitly approximate beam cap. Corrected outputs are cached under
-`results/data_v7`; the cache identity includes the full configuration and a
-source-code fingerprint.
+The default `--max-hypotheses 100` beam cap is applied after the paper's
+relative-weight pruning and bounds per-trial runtime. Pass `--max-hypotheses 0`
+only for uncapped research runs; ambiguous six-object cases can otherwise grow
+too large to finish. Corrected outputs are cached under `results/data_v8`; the
+cache identity includes the full configuration and a source-code fingerprint.
 
 Run the dependency-free test suite with:
 
 ```bash
 python -m unittest discover -s tests -v
+```
+
+Verify that one production-size trial for every `M` and mode stays below five
+minutes on a target machine with:
+
+```bash
+OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+python benchmark_runtime.py --max-seconds 300
 ```
 
 ## Scope and provenance
@@ -48,6 +57,6 @@ The continuous belief uses one EKF per discrete hypothesis rather than the
 paper's GTSAM/iSAM2 factor-graph smoother. See [EXPERIMENT.md](EXPERIMENT.md)
 for the experiment design and limitations.
 
-Files under `results/data_v1` through `results/data_v6` are legacy artifacts
+Files under `results/data_v1` through `results/data_v7` are legacy artifacts
 from an earlier, incompatible formulation. They must not be reported as results
-of the corrected experiment; v7 results require a fresh run.
+of the bounded experiment; v8 results require a fresh run.

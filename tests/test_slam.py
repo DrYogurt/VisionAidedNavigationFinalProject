@@ -150,5 +150,30 @@ class TestSemanticSLAM(unittest.TestCase):
         objects = np.array([[4.0, 0.0, 0.0], [6.0, 0.0, 0.0], [0.0, 4.0, 0.0]])
         np.testing.assert_array_equal(engine._batch_visibility(robots, objects), [1.0, 0.0, 0.0])
 
+    def test_data_association_is_injective_within_time_step(self):
+        config = EnvironmentConfig(
+            num_objects=2,
+            num_classes_in_model=1,
+            num_samples=50,
+            sensor_range=100.0,
+            max_hypotheses=100,
+            sigma_p=np.diag([0.01, 0.01, 0.01]),
+        )
+        env = Environment(config, seed=13)
+        engine = SemanticSLAMEngine(config, env.objects, mode="geometric_only")
+        observations = [
+            (
+                obj.id,
+                engine.geo_model.observe(config.initial_robot_pose, obj.gt_pose),
+                np.ones(1),
+            )
+            for obj in env.objects
+        ]
+        engine.step(np.zeros(3), observations, np.random.default_rng(13))
+        self.assertTrue(engine.hypotheses)
+        for hypothesis in engine.hypotheses:
+            beta_vector = hypothesis.da_history[-1]
+            self.assertEqual(len(beta_vector), len(set(beta_vector)))
+
 if __name__ == "__main__":
     unittest.main()
