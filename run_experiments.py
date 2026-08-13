@@ -221,10 +221,13 @@ def plot_metrics_per_m(multi_env_data: dict, output_dir: str):
         ax.grid(True, linestyle="--", alpha=0.5)
         ax.legend(fontsize=9)
 
-    plt.suptitle("DA Ambiguity H(w) over Time Across Environments (M=1..5)", y=0.98, fontsize=14)
-    plt.tight_layout(rect=[0, 0, 1, 0.92])
-    plt.savefig(os.path.join(output_dir, "da_entropy_comparison_all_M.png"), dpi=300)
-    plt.close()
+    fig.suptitle(
+        "DA Ambiguity H(w) over Time Across Environments (M=1..5)",
+        x=0.5, y=0.98, fontsize=14,
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.92])
+    fig.savefig(os.path.join(output_dir, "da_entropy_comparison_all_M.png"), dpi=300)
+    plt.close(fig)
 
     # 2. Position Covariance Det det(Sigma)
     fig, axes = plt.subplots(1, 5, figsize=(22, 4.5), sharey=True)
@@ -249,10 +252,16 @@ def plot_metrics_per_m(multi_env_data: dict, output_dir: str):
         ax.grid(True, linestyle="--", alpha=0.5)
         ax.legend(fontsize=9)
 
-    plt.suptitle("Localization Uncertainty det(Σ) Across Environments (M=1..5)", y=0.98, fontsize=14)
-    plt.tight_layout(rect=[0, 0, 1, 0.92])
-    plt.savefig(os.path.join(output_dir, "pose_covariance_det_comparison_all_M.png"), dpi=300)
-    plt.close()
+    fig.suptitle(
+        "Localization Uncertainty det(Σ) Across Environments (M=1..5)",
+        x=0.5, y=0.98, fontsize=14,
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.92])
+    fig.savefig(
+        os.path.join(output_dir, "pose_covariance_det_comparison_all_M.png"),
+        dpi=300,
+    )
+    plt.close(fig)
 
 def plot_trajectories_for_each_m(multi_env_data: dict, output_dir: str):
     """
