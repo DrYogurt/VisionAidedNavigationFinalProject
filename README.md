@@ -30,11 +30,46 @@ The estimator always considers five candidate classes, giving a fixed nominal
 belief class space of `5^6 = 15,625` realizations. Varying `M` therefore changes
 only actual scene diversity, not the belief vocabulary size.
 
-The v9 run uses 20 environments × 50 trials × 5 scene-class counts × 2
-inference modes, or 10,000 trial experiments. Corrected v9 numerical results
-are pending the fresh run and analysis. Results under `results/data_v8` answer a
-different question—one actual class with a varying belief vocabulary—and must
-not be reused as v9 evidence.
+The completed v9 run uses 20 environments × 50 trials × 5 scene-class counts ×
+2 inference modes, or 10,000 trial experiments. All 100 checkpoints passed the
+v9 integrity checks. Results under `results/data_v8` answer a different
+question—one actual class with a varying belief vocabulary—and must not be
+reused as v9 evidence.
+
+## Completed v9 results
+
+Viewpoint-dependent semantics reduced final pose error relative to the paired
+geometric-only baseline for every actual scene-class count. Normal-approximation
+95% confidence intervals use the 20 environment means as independent units.
+
+| M | Semantic pose error (m) | Geometric pose error (m) | Paired difference (m) | Reduction |
+|---:|---:|---:|---:|---:|
+| 1 | 0.6526 ± 0.0557 | 0.7777 ± 0.1001 | -0.1251 ± 0.0632 | 16.1% |
+| 2 | 0.6541 ± 0.0564 | 0.7777 ± 0.1001 | -0.1237 ± 0.0668 | 15.9% |
+| 3 | 0.6813 ± 0.0698 | 0.7777 ± 0.1001 | -0.0965 ± 0.0556 | 12.4% |
+| 4 | 0.6633 ± 0.0665 | 0.7777 ± 0.1001 | -0.1144 ± 0.0626 | 14.7% |
+| 5 | 0.6889 ± 0.0686 | 0.7777 ± 0.1001 | -0.0888 ± 0.0529 | 11.4% |
+
+Negative paired differences favor semantics; all five paired intervals exclude
+zero. Pose error is not monotonic in scene diversity. In contrast, final DA
+entropy decreases from 2.665 at `M=1` to 0.474 at `M=5`, mean active hypotheses
+decrease from 32.59 to 4.88, and semantic inference time decreases from 244.3
+to 91.1 ms/step. The geometric outputs are identical across `M`, which is the
+expected control behavior because that mode ignores class labels. No visibility
+recovery occurred, and the slowest individual trial took 9.963 seconds.
+
+- [Full generated analysis](results/milkjug_v9/v9/RESULTS_ANALYSIS.md)
+- [Aggregate results](results/milkjug_v9/v9/aggregate_results.png)
+- [Paired pose-error effect](results/milkjug_v9/v9/paired_pose_error_difference.png)
+- [Accuracy versus actual classes](results/milkjug_v9/v9/accuracy_vs_actual_classes.png)
+- [DA entropy](results/milkjug_v9/v9/da_entropy_comparison_all_M.png)
+- [Pose covariance](results/milkjug_v9/v9/pose_covariance_det_comparison_all_M.png)
+- [Tractability](results/milkjug_v9/v9/tractability_table_graph.png)
+- Trajectories: [M=1](results/milkjug_v9/v9/trajectory_visualization_M1.png),
+  [M=2](results/milkjug_v9/v9/trajectory_visualization_M2.png),
+  [M=3](results/milkjug_v9/v9/trajectory_visualization_M3.png),
+  [M=4](results/milkjug_v9/v9/trajectory_visualization_M4.png), and
+  [M=5](results/milkjug_v9/v9/trajectory_visualization_M5.png)
 
 ## Reproduce the experiment
 
@@ -54,7 +89,7 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
 .venv/bin/python -u run_experiments.py \
   --num-environments 20 --trials 50 --steps 10 --num-objects 6 \
   --num-samples 1000 --pruning-ratio 150 --max-hypotheses 100 \
-  --workers 2
+  --workers 8
 ```
 
 Independent `(mode, trial)` jobs run in worker processes. Memory use grows
@@ -69,7 +104,7 @@ block.
 
 ## Analyze results
 
-After all 100 v9 checkpoints complete, generate the aggregate CSV, paired
+After all 100 v9 checkpoints complete, regenerate the aggregate CSV, paired
 analysis, Markdown report, and summary figures with:
 
 ```bash

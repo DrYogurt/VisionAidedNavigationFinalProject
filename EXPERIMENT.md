@@ -75,19 +75,45 @@ whose objects do not contain exactly classes $0..M-1$.
 
 # Results
 
-Corrected v9 numerical results are pending completion of the fresh experiment
-and analysis. The completed v8 results and figures describe one actual class
-with a varying belief class count; they answer a different question and must
-not be substituted or pooled with v9.
+The corrected v9 study completed all 100 `(environment, M)` checkpoints and
+10,000 trial experiments. The table reports means and normal-approximation 95%
+confidence intervals across the 20 environment means. The paired difference is
+viewpoint-dependent minus geometric-only, so negative values favor semantics.
+
+| M | Viewpoint-dependent pose error (m) | Geometric-only pose error (m) | Paired difference (m) | Reduction |
+|---:|---:|---:|---:|---:|
+| 1 | 0.6526 ± 0.0557 | 0.7777 ± 0.1001 | -0.1251 ± 0.0632 | 16.1% |
+| 2 | 0.6541 ± 0.0564 | 0.7777 ± 0.1001 | -0.1237 ± 0.0668 | 15.9% |
+| 3 | 0.6813 ± 0.0698 | 0.7777 ± 0.1001 | -0.0965 ± 0.0556 | 12.4% |
+| 4 | 0.6633 ± 0.0665 | 0.7777 ± 0.1001 | -0.1144 ± 0.0626 | 14.7% |
+| 5 | 0.6889 ± 0.0686 | 0.7777 ± 0.1001 | -0.0888 ± 0.0529 | 11.4% |
+
+Every paired 95% interval excludes zero in favor of viewpoint-dependent
+semantics. Pose error itself does not improve monotonically with actual class
+diversity: the lowest mean occurs at $M=1$ and the highest semantic mean at
+$M=5$. The clear diversity effect is computational and associational. Final DA
+entropy falls from 2.665 at $M=1$ to 0.474 at $M=5$, mean active hypotheses fall
+from 32.59 to 4.88, and semantic inference time falls from 244.3 to 91.1 ms per
+step. The geometric-only outputs remain identical across $M$, as expected from
+holding geometry, seeds, and the non-semantic inference path fixed.
+
+No visibility-support recovery was needed. The slowest recorded individual
+trial took 9.963 seconds, and the eight-worker full run completed in about 40
+minutes on `milkjug`. Corrected figures and the generated report are stored in
+`results/milkjug_v9/v9`. Completed v8 results describe one actual class with a
+varying belief class count; they answer a different question and must not be
+substituted or pooled with v9.
 
 # Interpretation and Limitations
 
-If viewpoint-dependent inference reduces paired pose error and DA entropy as
-actual class diversity increases, that would support the claim that semantic
-diversity helps resolve geometric association ambiguity under a fixed belief
-model. A flat geometric baseline across $M$ would be expected because object
-positions, tracks, noise dimensions, and geometric inference are held fixed;
-deviations should be checked for stochastic or implementation effects.
+The results support the narrower claim that viewpoint-dependent semantic
+evidence improves pose estimation relative to geometry-only inference at every
+tested class count. They also show that increasing actual class diversity
+sharply resolves DA ambiguity and reduces the number of retained hypotheses.
+They do not support a monotonic pose-accuracy benefit from diversity: semantic
+pose error varies non-monotonically and its relative reduction is smaller at
+$M=5$ than at $M=1$. The exactly flat geometric baseline is a useful control,
+confirming that $M$ does not leak into the non-semantic inference path.
 
 The experiment remains limited by its EKF approximation, factor-by-factor
 pruning, top-100 beam cap, synthetic observations, deterministic round-robin
