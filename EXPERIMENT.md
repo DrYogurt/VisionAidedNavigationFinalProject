@@ -1,142 +1,97 @@
 # Research Question and Hypothesis
 
-This project asks whether semantic observations from a viewpoint-dependent
-classifier improve simultaneous localization and mapping when data association
-(DA) is uncertain. It follows *Data Association Aware Semantic Mapping and
-Localization via a Viewpoint-Dependent Classifier Model* and extends the
-paper's class-realization experiment. Each scene contains six objects with the
-same ground-truth class, while inference treats every object's class as an
-independent latent variable. The candidate class count is varied over
-$M\in\{1,2,3,4,5\}$, corresponding to a nominal $M^6$ class-realization space.
+This project asks how increasing the number of distinct object classes actually
+present in a scene affects viewpoint-dependent semantic SLAM when the
+estimator's class vocabulary remains fixed. The scene contains six stationary
+objects, and the actual class count is varied over
+$M\in\{1,2,3,4,5\}$. Every inference condition maintains the same five-class
+belief. Thus $M$ denotes environmental class diversity, not the number of
+candidate classes in the belief.
 
-The hypothesis is that viewpoint-dependent semantic evidence will reduce DA
-ambiguity, localization uncertainty, and pose error relative to the
-geometry-only passive DA-BSP baseline. The original expectation was that more
-candidate classes would increase the number of active hypotheses, while
-likelihood pruning would keep the represented subset tractable. The completed
-study refines that expectation: semantic discrimination causes a sharp drop in
-active hypotheses from the no-information $M=1$ control to $M=2$, after which
-hypothesis count grows moderately with $M$.
+The hypothesis is that viewpoint-dependent semantic evidence will reduce data
+association (DA) ambiguity, localization uncertainty, and pose error relative
+to geometry-only passive DA-BSP, and that its usefulness may change as the six
+objects become more class-diverse. Because the model vocabulary and nominal
+$5^6$ class-realization space are fixed, differences across $M$ should not be
+attributed to changing belief dimensionality.
 
 # Implementation and Experimental Setup
 
 The estimator represents a hybrid discrete-continuous belief. Discrete
-hypotheses contain object-class assignments and the complete DA history; every
-hypothesis carries a joint EKF approximation over the current robot pose and
-stationary object poses. This differs from the paper's per-hypothesis
-factor-graph/iSAM2 smoother and is an important approximation.
+hypotheses contain object-class assignments and complete DA histories; every
+hypothesis carries a joint EKF approximation over the robot pose and stationary
+object poses. This differs from the paper's per-hypothesis factor-graph/iSAM2
+smoother and remains an important approximation.
 
 At each observation, candidate associations are scored with the range-bearing
-measurement likelihood, a visibility factor, and, for the active method, the
+measurement likelihood, a visibility factor, and, for the active method, a
 semantic likelihood. Associations within one timestep are injective because
-the simulator generates at most one detection per physical object. Classes
-remain marginalized under a uniform prior until an object becomes relevant to
-an association hypothesis. Components are normalized and pruned by the
-paper-style maximum-weight ratio of 150, followed by a documented top-100 beam
-cap.
+the simulator emits at most one detection per physical object. Object classes
+remain marginalized under a uniform five-class prior until they become
+relevant to an association hypothesis. Components are normalized and pruned by
+the paper-style maximum-weight ratio of 150, followed by a top-100 beam cap.
 
-The active method uses the paper's viewpoint-dependent classifier mean. For
-$M=2$, the implementation follows Equation 18 with the paper's view-angle
-convention, precision, and covariance. For $M>2$, a symmetric extension divides
-the Equation 18 error mass uniformly among the other $M-1$ classes. The passive
-baseline uses only geometry and visibility; it is not a viewpoint-independent
-semantic classifier.
+For every condition, `num_classes_in_model=5`. The semantic observation is
+therefore always five-dimensional and uses the documented symmetric extension
+of Equation 18, distributing viewpoint-dependent error mass uniformly among
+the other four modeled classes. The geometry-only baseline ignores semantic
+measurements. Since the paper defines the likelihood for two modeled classes,
+none of these fixed-five-class conditions is an exact reproduction of its
+two-class observation model.
 
-The visibility factor is a hard Monte Carlo indicator. Finite samples and beam
-pruning can rarely leave no gated candidate for an observation even though its
-measurement likelihood remains finite. In that case the implementation uses
-the finite geometric/semantic measurement likelihood without the visibility
-gate and records a `visibility_recoveries` event. This path is used only when
-all gated candidates are zero.
+The actual scene setting is `num_classes_in_scene=M`. Ground-truth classes are
+assigned round-robin by object ID, guaranteeing that every class is represented
+and making frequencies as even as six objects permit. Across $M=1..5$, the
+assignments are `[0,0,0,0,0,0]`, `[0,1,0,1,0,1]`,
+`[0,1,2,0,1,2]`, `[0,1,2,3,0,1]`, and `[0,1,2,3,4,0]`.
 
-The final study used 20 independently seeded environments, 50 tracks per
-environment, 10 timesteps per track, six objects, 1,000 marginal-likelihood
-samples, and both inference modes for every $M$. This yields
-$20\times50\times5\times2=10{,}000$ trial experiments. `(mode, trial)` jobs ran
-in two worker processes with deterministic observation and inference seeds.
-Completed `(environment, M)` blocks were cached, allowing the repaired run to
-resume without recomputing successful blocks.
+The full v9 design uses 20 independently seeded environments, 50 tracks per
+environment, 10 timesteps per track, six objects, 1,000 Monte Carlo samples,
+five actual class counts, and two inference modes. This yields 10,000 trial
+experiments. Independent `(mode, trial)` jobs run in two worker processes with
+fixed random seeds. Completed `(environment, M)` blocks are stored in the
+incompatible v9 cache so no v8 result can be loaded accidentally.
+
+The hard visibility factor can rarely lose all retained Monte Carlo support.
+When all gated candidates for an observation are zero but the measurement
+likelihood is finite, the engine uses the ungated measurement likelihood and
+records a `visibility_recoveries` event instead of aborting the study.
 
 # Evaluation Metrics
 
-The primary accuracy metric is the final Euclidean position error of the
-highest-weight hypothesis. The implementation also reports posterior-weighted
-position error, DA-posterior entropy after marginalizing class realizations,
-the determinant of the highest-weight robot position covariance, and the number
-of active joint class/DA hypotheses after pruning. Runtime per step and per
-trial are implementation tractability diagnostics.
+The primary metric is final Euclidean robot-position error for the
+highest-weight hypothesis. Additional metrics are posterior-weighted position
+error, entropy of the DA posterior after class marginalization, determinant of
+the highest-weight robot position covariance, active joint class/DA hypothesis
+count, inference time per step, complete-trial runtime, and visibility recovery
+count.
 
-For inference comparisons, each of the 20 environment-level means is treated
-as an independent unit. Reported intervals are normal-approximation 95%
-confidence intervals across those environment means. The semantic and
-geometric errors are also compared as paired environment-level differences.
-This avoids treating 1,000 correlated trials as independent replicates.
+Each environment mean is treated as one independent unit. Results report
+normal-approximation 95% confidence intervals across 20 environment means and
+paired environment-level semantic-minus-geometric differences. The analyzer
+rejects incomplete data, a model class count other than five, or any checkpoint
+whose objects do not contain exactly classes $0..M-1$.
 
 # Results
 
-The full v8 experiment completed all 100 environment/class checkpoints and all
-10,000 trial experiments. Final position error was:
-
-| $M$ | Viewpoint-dependent (m) | Geometric-only (m) | Paired semantic − geometric (m) | Reduction |
-|---:|---:|---:|---:|---:|
-| 1 | 0.7746 ± 0.1164 | 0.7746 ± 0.1164 | +0.0000 ± 0.0000 | 0.0% |
-| 2 | 0.6036 ± 0.0426 | 0.7615 ± 0.1038 | −0.1579 ± 0.0693 | 20.7% |
-| 3 | 0.6651 ± 0.0672 | 0.7639 ± 0.1042 | −0.0988 ± 0.0540 | 12.9% |
-| 4 | 0.6949 ± 0.0724 | 0.7502 ± 0.0982 | −0.0552 ± 0.0510 | 7.4% |
-| 5 | 0.6526 ± 0.0557 | 0.7777 ± 0.1001 | −0.1251 ± 0.0632 | 16.1% |
-
-Negative paired differences favor semantics. The paired 95% interval excludes
-zero for $M=2,3,4,5$ and is exactly zero for $M=1$, where there is no class
-information. The strongest observed reduction was 20.7% at $M=2$, the class
-count defined directly by the paper.
-
-The semantic method also reduced final DA entropy. For $M=2,3,4,5$, its mean
-final entropies were 2.069, 2.525, 2.628, and 2.665, compared with 3.793, 3.761,
-3.782, and 3.749 for geometry-only inference. Mean active hypothesis counts
-were 22.35, 30.26, 31.87, and 32.59 for semantics versus approximately 60 for
-the geometric baseline. The $M=1$ control maintained 59.55 hypotheses in both
-modes. Thus semantics did not merely improve the selected trajectory; it
-concentrated the represented DA posterior and allowed more aggressive
-likelihood pruning.
-
-Mean viewpoint-dependent inference time ranged from 109 to 205 ms per step,
-while the geometric baseline ranged from 156 to 159 ms per step. The semantic
-method was fastest at $M=2$ because it retained far fewer components, then grew
-more expensive as $M$ increased. The slowest recorded complete trial took
-7.783 seconds, comfortably below the five-minute requirement. Two
-visibility-support recoveries were recorded across 10,000 trials: one in the
-$M=2$ geometric condition and one in the $M=3$ geometric condition.
-
-The raw checkpoints, aggregate CSV, report, experiment log, and all figures are
-available locally under `results/milkjug_full/`. `aggregate_results.png` shows
-the main error, entropy, hypothesis-count, and timing trends;
-`paired_pose_error_difference.png` shows the paired accuracy effect.
+Corrected v9 numerical results are pending completion of the fresh experiment
+and analysis. The completed v8 results and figures describe one actual class
+with a varying belief class count; they answer a different question and must
+not be substituted or pooled with v9.
 
 # Interpretation and Limitations
 
-The completed results support the research hypothesis within this simulator.
-When at least two classes are modeled, viewpoint-dependent semantics reduce DA
-ambiguity and final localization error relative to geometry alone. The exact
-match at $M=1$ is a useful control: without discriminative class information,
-the active and passive methods produce the same scientific outputs. The large
-improvement at $M=2$ most directly supports the paper-aligned comparison. The
-continued benefit at $M=3..5$ suggests that the symmetric extension remains
-useful in this synthetic setting, although it is not a model supplied or
-validated by the paper.
+If viewpoint-dependent inference reduces paired pose error and DA entropy as
+actual class diversity increases, that would support the claim that semantic
+diversity helps resolve geometric association ambiguity under a fixed belief
+model. A flat geometric baseline across $M$ would be expected because object
+positions, tracks, noise dimensions, and geometric inference are held fixed;
+deviations should be checked for stochastic or implementation effects.
 
-The experiment does not show monotonic accuracy improvement as $M$ increases.
-$M$ changes both the class hypothesis space and the multiclass semantic
-likelihood; after $M=2$, added class ambiguity partly offsets the available
-semantic information. The top-100 cap also means active-hypothesis counts
-describe the bounded implementation rather than the full posterior or the
-nominal $M^6$ space.
-
-Other limitations are the EKF continuous-state approximation, factor-by-factor
-threshold pruning, synthetic geometry and semantic measurements, finite Monte
-Carlo marginalization, and the two disclosed visibility-support recoveries.
-Normal-approximation intervals summarize variation across 20 generated
-environments but do not prove generalization to real scenes. Runtime depends on
-the tested hardware and process load and is not evidence of asymptotic scaling.
-Future work should use an incremental factor-graph smoother, calibrated real
-classifier outputs, more environments, and sensitivity studies over beam size,
-sample count, pruning ratio, and recovery policy.
+The experiment remains limited by its EKF approximation, factor-by-factor
+pruning, top-100 beam cap, synthetic observations, deterministic round-robin
+class balance, finite Monte Carlo sampling, and recovery policy. The fixed
+five-class semantic likelihood is an extension rather than the paper's exact
+two-class model. Results over 20 simulated environments do not establish
+generalization to real classifiers or scenes, and runtime is an implementation
+diagnostic rather than asymptotic evidence.

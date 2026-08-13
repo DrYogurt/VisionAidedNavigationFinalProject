@@ -1,4 +1,4 @@
-"""Benchmark one production-size trial for every class count and mode."""
+"""Benchmark one production-size v9 trial for every scene class count and mode."""
 
 import argparse
 import time
@@ -16,11 +16,11 @@ def main():
 
     failures = []
     print("M,mode,seconds", flush=True)
-    for num_classes in range(1, 6):
+    for num_scene_classes in range(1, 6):
         config = EnvironmentConfig(
             num_objects=6,
-            num_classes_in_scene=1,
-            num_classes_in_model=num_classes,
+            num_classes_in_scene=num_scene_classes,
+            num_classes_in_model=5,
             num_trials=1,
             num_steps=10,
             num_samples=args.num_samples,
@@ -36,9 +36,9 @@ def main():
             )
             elapsed = time.perf_counter() - start
             measured = float(result["trial_time"][0])
-            print(f"{num_classes},{mode},{measured:.3f}", flush=True)
+            print(f"{num_scene_classes},{mode},{measured:.3f}", flush=True)
             if elapsed > args.max_seconds:
-                failures.append((num_classes, mode, elapsed))
+                failures.append((num_scene_classes, mode, elapsed))
 
     if failures:
         details = ", ".join(

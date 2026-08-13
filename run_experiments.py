@@ -23,7 +23,7 @@ def mean_and_95_ci(values: np.ndarray, axis: int = 0):
 
 def configure_hyperparameters(
     num_objects: int = 6,
-    num_classes: int = 2,
+    num_model_classes: int = 5,
     num_trials: int = 50,
     num_steps: int = 10,
     num_samples: int = 1000,
@@ -42,7 +42,7 @@ def configure_hyperparameters(
     config = EnvironmentConfig(
         num_objects=num_objects,
         num_classes_in_scene=1,
-        num_classes_in_model=num_classes,
+        num_classes_in_model=num_model_classes,
         num_trials=num_trials,
         num_steps=num_steps,
         num_samples=num_samples,
@@ -60,7 +60,7 @@ def configure_hyperparameters(
     return config
 
 def setup_results_dir() -> str:
-    res_dir = os.path.join(os.path.dirname(__file__), "results")
+    res_dir = os.path.join(os.path.dirname(__file__), "results", "v9")
     os.makedirs(res_dir, exist_ok=True)
     return res_dir
 
@@ -69,7 +69,7 @@ def plot_tractability_table_graph(multi_env_data: dict, output_dir: str):
     Generates a dedicated 4-panel graph plotting all metrics from the Class Scaling & Tractability Study:
     - Active Hypotheses (N_k) vs M
     - Inference Time per Step (ms) vs M
-    - Log Map Realizations (M^N) vs M
+    - Fixed belief class realizations (5^N) vs M
     - Final Pose Estimation Error (m) vs M (Viewpoint-Dependent vs geometric-only)
     """
     classes = sorted(list(multi_env_data.keys()))
@@ -79,7 +79,8 @@ def plot_tractability_table_graph(multi_env_data: dict, output_dir: str):
 
     active_hyps = []
     times_ms = []
-    realizations = [M ** num_objects for M in classes]
+    model_class_count = first_environment["runner"].config.num_classes_in_model
+    realizations = [model_class_count ** num_objects for _M in classes]
     vp_err_mean = []
     pas_err_mean = []
 
@@ -109,46 +110,50 @@ def plot_tractability_table_graph(multi_env_data: dict, output_dir: str):
 
     # Panel 1: Active Hypotheses
     axes[0, 0].plot(classes, active_hyps, 'o-', color='#1f77b4', linewidth=2.5, markersize=8)
-    axes[0, 0].set_title("Active Hypotheses (N_k) vs. Class Complexity M")
-    axes[0, 0].set_xlabel("Number of Classes (M)")
+    axes[0, 0].set_title("Active Hypotheses (N_k) vs. Scene Class Count M")
+    axes[0, 0].set_xlabel("Actual Classes Present (M)")
     axes[0, 0].set_ylabel("Avg Active Hypotheses (N_k)")
     axes[0, 0].set_xticks(classes)
     axes[0, 0].grid(True, linestyle="--", alpha=0.5)
 
     # Panel 2: Inference Time
     axes[0, 1].plot(classes, times_ms, 's-', color='#2ca02c', linewidth=2.5, markersize=8)
-    axes[0, 1].set_title("Inference Speed (ms/step) vs. Class Complexity M")
-    axes[0, 1].set_xlabel("Number of Classes (M)")
+    axes[0, 1].set_title("Inference Speed (ms/step) vs. Scene Class Count M")
+    axes[0, 1].set_xlabel("Actual Classes Present (M)")
     axes[0, 1].set_ylabel("Time per Step (ms)")
     axes[0, 1].set_xticks(classes)
     axes[0, 1].grid(True, linestyle="--", alpha=0.5)
 
-    # Panel 3: Map Realizations M^N
+    # Panel 3: the five-class belief space is fixed for every scene condition.
     axes[1, 0].plot(classes, realizations, '^--', color='#9467bd', linewidth=2.5, markersize=8)
     axes[1, 0].set_yscale('log')
-    axes[1, 0].set_title("Discrete Class Realizations (M^N) [log scale]")
-    axes[1, 0].set_xlabel("Number of Classes (M)")
-    axes[1, 0].set_ylabel("Map Realizations (M^N)")
+    axes[1, 0].set_title(f"Fixed Belief Class Realizations ({model_class_count}^N) [log scale]")
+    axes[1, 0].set_xlabel("Actual Classes Present (M)")
+    axes[1, 0].set_ylabel(f"Belief Realizations ({model_class_count}^N)")
     axes[1, 0].set_xticks(classes)
     axes[1, 0].grid(True, linestyle="--", alpha=0.5)
 
     # Panel 4: Final Pose Estimation Error
     axes[1, 1].plot(classes, vp_err_mean, 'o-', color='#1f77b4', linewidth=2.5, markersize=8, label='Viewpoint-Dependent')
     axes[1, 1].plot(classes, pas_err_mean, 's--', color='#ff7f0e', linewidth=2.5, markersize=8, label='Geometric-only DA-BSP')
-    axes[1, 1].set_title("Pose Error vs. Class Complexity M")
-    axes[1, 1].set_xlabel("Number of Classes (M)")
+    axes[1, 1].set_title("Pose Error vs. Scene Class Count M")
+    axes[1, 1].set_xlabel("Actual Classes Present (M)")
     axes[1, 1].set_ylabel("Final Pose Error (meters)")
     axes[1, 1].set_xticks(classes)
     axes[1, 1].grid(True, linestyle="--", alpha=0.5)
     axes[1, 1].legend()
 
-    plt.suptitle("Comprehensive Class Scaling & Tractability Study (M=1..5)", fontsize=16, y=0.98)
+    plt.suptitle(
+        "Actual-Class Diversity Study with a Fixed Five-Class Belief (M=1..5)",
+        fontsize=16,
+        y=0.98,
+    )
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.savefig(os.path.join(output_dir, "tractability_table_graph.png"), dpi=300)
     plt.close()
 
 def plot_accuracy_vs_classes(multi_env_data: dict, output_dir: str):
-    """Plots Pose Estimation Error vs Number of Classes M across 20 unique environments."""
+    """Plot pose error against the number of actual classes present."""
     classes = sorted(list(multi_env_data.keys()))
     vp_means, vp_stds = [], []
     pas_means, pas_stds = [], []
@@ -181,14 +186,14 @@ def plot_accuracy_vs_classes(multi_env_data: dict, output_dir: str):
 
     num_environments = len(next(iter(multi_env_data.values())))
     num_trials = next(iter(next(iter(multi_env_data.values())).values()))["runner"].config.num_trials
-    plt.title(f"Accuracy vs. Candidate Classes M ({num_environments} Envs x {num_trials} Trials)")
-    plt.xlabel("Number of Object Classes (M)")
+    plt.title(f"Accuracy vs. Actual Classes Present M ({num_environments} Envs x {num_trials} Trials)")
+    plt.xlabel("Actual Classes Present (M)")
     plt.ylabel("Final Pose Estimation Error (meters)")
     plt.xticks(classes)
     plt.grid(True, linestyle="--", alpha=0.6)
     plt.legend(loc="upper left")
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, "accuracy_vs_num_classes.png"), dpi=300)
+    plt.savefig(os.path.join(output_dir, "accuracy_vs_actual_classes.png"), dpi=300)
     plt.close()
 
 def plot_metrics_per_m(multi_env_data: dict, output_dir: str):
@@ -214,7 +219,7 @@ def plot_metrics_per_m(multi_env_data: dict, output_dir: str):
         ax.plot(steps, pas_m, 'r--', linewidth=2.0, label='Geometric-only')
         ax.fill_between(steps, pas_m - pas_s, pas_m + pas_s, color='red', alpha=0.15)
 
-        ax.set_title(f"M = {M} Classes")
+        ax.set_title(f"M = {M} Actual Classes")
         ax.set_xlabel("Time Step (k)")
         if idx == 0:
             ax.set_ylabel("DA Weight Entropy H(w)")
@@ -222,7 +227,7 @@ def plot_metrics_per_m(multi_env_data: dict, output_dir: str):
         ax.legend(fontsize=9)
 
     fig.suptitle(
-        "DA Ambiguity H(w) over Time Across Environments (M=1..5)",
+        "DA Ambiguity vs. Actual Scene Classes (Fixed Five-Class Belief)",
         x=0.5, y=0.98, fontsize=14,
     )
     fig.tight_layout(rect=[0, 0, 1, 0.92])
@@ -245,7 +250,7 @@ def plot_metrics_per_m(multi_env_data: dict, output_dir: str):
         ax.plot(steps, vp_m, 'b-', linewidth=2.0, label='Viewpoint-Dep')
         ax.plot(steps, pas_m, 'r--', linewidth=2.0, label='Geometric-only')
         ax.set_yscale('log')
-        ax.set_title(f"M = {M} Classes")
+        ax.set_title(f"M = {M} Actual Classes")
         ax.set_xlabel("Time Step (k)")
         if idx == 0:
             ax.set_ylabel("det(Σ_pos) [log scale]")
@@ -253,7 +258,7 @@ def plot_metrics_per_m(multi_env_data: dict, output_dir: str):
         ax.legend(fontsize=9)
 
     fig.suptitle(
-        "Localization Uncertainty det(Σ) Across Environments (M=1..5)",
+        "Localization Uncertainty vs. Actual Scene Classes (Fixed Five-Class Belief)",
         x=0.5, y=0.98, fontsize=14,
     )
     fig.tight_layout(rect=[0, 0, 1, 0.92])
@@ -265,7 +270,7 @@ def plot_metrics_per_m(multi_env_data: dict, output_dir: str):
 
 def plot_trajectories_for_each_m(multi_env_data: dict, output_dir: str):
     """
-    Generates Trajectory Visualizations (Best, Median, Combined Overlay) for EACH class count M.
+    Generates trajectory visualizations for each actual scene class count M.
     """
     class_colors = ['#d62728', '#9467bd', '#8c564b', '#e377c2', '#17becf']
 
@@ -303,7 +308,7 @@ def plot_trajectories_for_each_m(multi_env_data: dict, output_dir: str):
         ax.plot(gt_best[:, 0], gt_best[:, 1], 'k--', linewidth=2.5, label='Ground Truth Path')
         ax.plot(vp_best[:, 0], vp_best[:, 1], 'b-o', linewidth=2.0, label='Viewpoint-Dep (Best)')
         ax.plot(pas_best[:, 0], pas_best[:, 1], 'r--s', linewidth=2.0, label='Geometric-only (Best)')
-        ax.set_title(f"M={M} Classes: Best Trial (Env #0, Trial #{best_trial_idx})")
+        ax.set_title(f"M={M} Actual Classes: Best Trial (Env #0, Trial #{best_trial_idx})")
         ax.set_xlabel("X Position (m)")
         ax.set_ylabel("Y Position (m)")
         ax.grid(True, linestyle="--", alpha=0.5)
@@ -322,7 +327,7 @@ def plot_trajectories_for_each_m(multi_env_data: dict, output_dir: str):
         ax.plot(gt_med[:, 0], gt_med[:, 1], 'k--', linewidth=2.5, label='Ground Truth Path')
         ax.plot(vp_med[:, 0], vp_med[:, 1], 'b-o', linewidth=2.0, label='Viewpoint-Dep (Median)')
         ax.plot(pas_med[:, 0], pas_med[:, 1], 'r--s', linewidth=2.0, label='Geometric-only (Median)')
-        ax.set_title(f"M={M} Classes: Median Trial (Env #0, Trial #{median_trial_idx})")
+        ax.set_title(f"M={M} Actual Classes: Median Trial (Env #0, Trial #{median_trial_idx})")
         ax.set_xlabel("X Position (m)")
         ax.set_ylabel("Y Position (m)")
         ax.grid(True, linestyle="--", alpha=0.5)
@@ -341,7 +346,7 @@ def plot_trajectories_for_each_m(multi_env_data: dict, output_dir: str):
             ax.plot(vp_path[:, 0], vp_path[:, 1], 'b-', alpha=0.3, label=lbl_vp)
             ax.plot(pas_path[:, 0], pas_path[:, 1], 'r--', alpha=0.2, label=lbl_pas)
 
-        ax.set_title(f"M={M} Classes: Combined Overlay ({num_t} Trials)")
+        ax.set_title(f"M={M} Actual Classes: Combined Overlay ({num_t} Trials)")
         ax.set_xlabel("X Position (m)")
         ax.set_ylabel("Y Position (m)")
         ax.grid(True, linestyle="--", alpha=0.5)
@@ -390,7 +395,7 @@ def main():
 
     config = configure_hyperparameters(
         num_objects=args.num_objects,
-        num_classes=2,
+        num_model_classes=5,
         num_trials=args.trials,
         num_steps=args.steps,
         num_samples=args.num_samples,
@@ -403,14 +408,15 @@ def main():
     )
 
     # 1. Run multi-environment study across 20 environments and M in [1, 2, 3, 4, 5]
-    print("Starting bounded multi-class experiment suite (v8.0.0)")
-    print("Results will be versioned and cached in results/data_v8")
+    print("Starting fixed-five-class-belief experiment suite (v9.0.0)")
+    print("M denotes actual classes present; the belief always models 5 classes")
+    print("Results will be versioned and cached in results/data_v9")
 
     multi_env_data = ExperimentRunner.run_multi_environment_study(
         base_config=config,
         num_environments=args.num_environments,
         trials_per_env=args.trials,
-        class_counts=[1, 2, 3, 4, 5],
+        actual_class_counts=[1, 2, 3, 4, 5],
         modes=["viewpoint_dependent", "geometric_only"],
         workers=args.workers,
     )
@@ -422,7 +428,7 @@ def main():
     plot_metrics_per_m(multi_env_data, output_dir)
     plot_trajectories_for_each_m(multi_env_data, output_dir)
 
-    print(f"\nExecution complete! Versioned raw data saved to 'results/data_v8/'. Artifacts written to: {output_dir}")
+    print(f"\nExecution complete! Versioned raw data saved to 'results/data_v9/'. Artifacts written to: {output_dir}")
 
 if __name__ == "__main__":
     main()

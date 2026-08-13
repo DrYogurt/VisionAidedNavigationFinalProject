@@ -11,7 +11,7 @@ class EnvironmentConfig:
     """
     num_objects: int = 6           # N: Total number of objects in the scene
     num_classes_in_scene: int = 1  # Distinct ground-truth classes represented in the scene
-    num_classes_in_model: int = 2  # M: candidate classes represented by the hybrid belief
+    num_classes_in_model: int = 5  # Candidate classes represented by the hybrid belief
     sensor_range: float = 6.0      # Maximum object-detection range [m]
     sensor_fov: float = 2.0 * np.pi # Camera field of view [rad]; 2*pi preserves the paper simulation's omnidirectional gate
     num_trials: int = 50           # Number of sampled ground truth tracks
@@ -94,7 +94,8 @@ class Environment:
 
             gt_pose = np.array([x_gt, y_gt, th_gt], dtype=np.float64)
 
-            # Ensure classes are somewhat evenly distributed
+            # Deterministically represent every requested scene class, as
+            # evenly as possible when num_objects is not divisible by M.
             gt_class = int(i % self.config.num_classes_in_scene)
 
             prior_noise = self.rng.multivariate_normal(

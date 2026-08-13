@@ -13,6 +13,43 @@ from src.metrics import MetricsCalculator
 from src.data_store import VersionedDataStore
 
 
+FIXED_MODEL_CLASS_COUNT = 5
+
+
+def build_study_config(
+    base_config: EnvironmentConfig,
+    num_scene_classes: int,
+    trials_per_env: int,
+) -> EnvironmentConfig:
+    """Build one v9 condition: M real classes, always five belief classes."""
+    if num_scene_classes > base_config.num_objects:
+        raise ValueError(
+            "num_scene_classes cannot exceed num_objects when every class "
+            "must be represented in the environment"
+        )
+    if num_scene_classes > FIXED_MODEL_CLASS_COUNT:
+        raise ValueError("the fixed five-class model cannot represent the scene")
+    return EnvironmentConfig(
+        num_objects=base_config.num_objects,
+        num_classes_in_scene=num_scene_classes,
+        num_classes_in_model=FIXED_MODEL_CLASS_COUNT,
+        sensor_range=base_config.sensor_range,
+        sensor_fov=base_config.sensor_fov,
+        num_trials=trials_per_env,
+        num_steps=base_config.num_steps,
+        num_samples=base_config.num_samples,
+        pruning_ratio=base_config.pruning_ratio,
+        max_hypotheses=base_config.max_hypotheses,
+        semantic_alpha=base_config.semantic_alpha,
+        semantic_k=base_config.semantic_k,
+        sigma_o=base_config.sigma_o.copy(),
+        sigma_p=base_config.sigma_p.copy(),
+        sigma_w=base_config.sigma_w.copy(),
+        sigma_v_geo=base_config.sigma_v_geo.copy(),
+        initial_robot_pose=base_config.initial_robot_pose.copy(),
+    )
+
+
 def _generate_observations(
     config: EnvironmentConfig,
     objects,
@@ -259,7 +296,7 @@ class ExperimentRunner:
         base_config: EnvironmentConfig,
         num_environments: int = 20,
         trials_per_env: int = 50,
-        class_counts: Optional[List[int]] = None,
+        actual_class_counts: Optional[List[int]] = None,
         modes: Optional[List[str]] = None,
         workers: int = 1,
     ) -> Dict[int, Dict[int, dict]]:
@@ -269,18 +306,20 @@ class ExperimentRunner:
 
         Returns nested dictionary: multi_env_data[M][env_id] = {results, runner}
         """
-        if class_counts is None:
-            class_counts = [1, 2, 3, 4, 5]
+        if actual_class_counts is None:
+            actual_class_counts = [1, 2, 3, 4, 5]
         if modes is None:
             modes = ["viewpoint_dependent", "geometric_only"]
         store = VersionedDataStore()
-        multi_env_data = {M: {} for M in class_counts}
+        multi_env_data = {M: {} for M in actual_class_counts}
 
         print(f"\n=========================================================================")
         print(f"  RUNNING MULTI-ENVIRONMENT STUDY ({num_environments} UNIQUE ENVS x {trials_per_env} TRIALS)")
         print(f"=========================================================================")
 
-        experiments_per_environment = len(class_counts) * len(modes) * trials_per_env
+        experiments_per_environment = (
+            len(actual_class_counts) * len(modes) * trials_per_env
+        )
         for env_id in range(num_environments):
             env_seed = 100 + env_id
             environment_progress = tqdm(
@@ -292,27 +331,11 @@ class ExperimentRunner:
             )
 
             try:
-                for M in class_counts:
-                    scaled_config = EnvironmentConfig(
-                        num_objects=base_config.num_objects,
-                        # Match the paper's same-class scene while varying M,
-                        # the number of candidate classes and M^N realizations.
-                        num_classes_in_scene=1,
-                        num_classes_in_model=M,
-                        sensor_range=base_config.sensor_range,
-                        sensor_fov=base_config.sensor_fov,
-                        num_trials=trials_per_env,
-                        num_steps=base_config.num_steps,
-                        num_samples=base_config.num_samples,
-                        pruning_ratio=base_config.pruning_ratio,
-                        max_hypotheses=base_config.max_hypotheses,
-                        semantic_alpha=base_config.semantic_alpha,
-                        semantic_k=base_config.semantic_k,
-                        sigma_o=base_config.sigma_o.copy(),
-                        sigma_p=base_config.sigma_p.copy(),
-                        sigma_w=base_config.sigma_w.copy(),
-                        sigma_v_geo=base_config.sigma_v_geo.copy(),
-                        initial_robot_pose=base_config.initial_robot_pose.copy(),
+                for M in actual_class_counts:
+                    scaled_config = build_study_config(
+                        base_config,
+                        num_scene_classes=M,
+                        trials_per_env=trials_per_env,
                     )
 
                     env = Environment.create_random_environment(scaled_config, env_seed)
@@ -321,7 +344,7 @@ class ExperimentRunner:
                     config_dict = {
                         "num_objects": scaled_config.num_objects,
                         "num_classes_in_scene": scaled_config.num_classes_in_scene,
-                        "num_classes_in_model": M,
+                        "num_classes_in_model": scaled_config.num_classes_in_model,
                         "sensor_range": scaled_config.sensor_range,
                         "sensor_fov": scaled_config.sensor_fov,
                         "num_trials": trials_per_env,

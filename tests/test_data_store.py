@@ -1,5 +1,3 @@
-import json
-import os
 import tempfile
 import unittest
 
@@ -27,32 +25,11 @@ class TestVersionedDataStore(unittest.TestCase):
             self.assertEqual(store.get_source_fingerprint(), store.get_source_fingerprint())
             self.assertEqual(len(store.get_source_fingerprint()), 16)
 
-    def test_allowlisted_checkpoint_with_exact_config_is_resumable(self):
+    def test_v9_cache_is_distinct_from_legacy_results(self):
         with tempfile.TemporaryDirectory() as directory:
             store = VersionedDataStore(directory)
-            config = {"num_steps": 10, "modes": ["geometric_only"]}
-            old_path = os.path.join(
-                directory, "env_12_M2_trials50_old_v8.0.0.json"
-            )
-            payload = {
-                "metadata": {
-                    "env_id": 12,
-                    "num_candidate_classes": 2,
-                    "num_trials": 50,
-                    "version": store.VERSION,
-                    "source_fingerprint": "bef21a006773792f",
-                    "config": config,
-                },
-                "results": {
-                    "geometric_only": {"da_entropy": [[0.0]]},
-                },
-            }
-            with open(old_path, "w") as handle:
-                json.dump(payload, handle)
-
-            self.assertTrue(store.exists(12, 2, 50, config))
-            loaded = store.load(12, 2, 50, config)
-            self.assertEqual(loaded["results"]["geometric_only"]["da_entropy"].shape, (1, 1))
+            self.assertEqual(store.VERSION, "v9.0.0")
+            self.assertFalse(store.exists(0, 2, 50, {"num_classes_in_model": 5}))
 
 
 if __name__ == "__main__":

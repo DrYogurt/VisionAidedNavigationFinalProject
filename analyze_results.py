@@ -1,4 +1,4 @@
-"""Aggregate and analyze a completed v8 semantic-SLAM experiment."""
+"""Aggregate and analyze the completed v9 actual-class diversity study."""
 
 import argparse
 import csv
@@ -14,6 +14,9 @@ MODE_LABELS = {
     "viewpoint_dependent": "Viewpoint-dependent",
     "geometric_only": "Geometric-only",
 }
+STUDY_VERSION = "v9.0.0"
+MODEL_CLASS_COUNT = 5
+EXPECTED_SCENE_CLASS_COUNTS = (1, 2, 3, 4, 5)
 
 
 def mean_ci95(values):
@@ -25,22 +28,36 @@ def mean_ci95(values):
 
 
 def load_checkpoints(data_dir, expected_environments, expected_trials):
-    """Load the newest complete v8 checkpoint for every (environment, M)."""
+    """Load and validate every v9 (environment, actual-class-count) checkpoint."""
     checkpoints = {}
     for path in Path(data_dir).glob("env_*_M*_trials*_*.json"):
         with path.open() as handle:
             payload = json.load(handle)
         metadata = payload.get("metadata", {})
-        if metadata.get("version") != "v8.0.0":
+        if metadata.get("version") != STUDY_VERSION:
             continue
         if metadata.get("num_trials") != expected_trials:
             continue
-        key = (metadata["env_id"], metadata["num_candidate_classes"])
+        scene_classes = metadata.get("num_scene_classes")
+        config = metadata.get("config", {})
+        if config.get("num_classes_in_scene") != scene_classes:
+            raise RuntimeError(f"scene-class metadata mismatch in {path}")
+        if config.get("num_classes_in_model") != MODEL_CLASS_COUNT:
+            raise RuntimeError(f"checkpoint does not use a five-class belief: {path}")
+        actual_classes = {
+            int(obj["gt_class"])
+            for obj in payload.get("environment", {}).get("objects", [])
+        }
+        if actual_classes != set(range(scene_classes)):
+            raise RuntimeError(
+                f"checkpoint does not contain exactly classes 0..{scene_classes - 1}: {path}"
+            )
+        key = (metadata["env_id"], scene_classes)
         timestamp = metadata.get("timestamp", "")
         if key not in checkpoints or timestamp > checkpoints[key][0]:
             checkpoints[key] = (timestamp, path, payload)
 
-    classes = sorted({key[1] for key in checkpoints})
+    classes = list(EXPECTED_SCENE_CLASS_COUNTS)
     expected_keys = {
         (env_id, class_count)
         for env_id in range(expected_environments)
@@ -162,12 +179,15 @@ def plot_aggregate(classes, rows, raw, output_path):
                 linestyle=linestyle, capsize=4, linewidth=2,
                 label=MODE_LABELS[mode],
             )
-        ax.set_xlabel("Candidate classes (M)")
+        ax.set_xlabel("Actual classes present (M)")
         ax.set_ylabel(ylabel)
         ax.set_xticks(classes)
         ax.grid(alpha=0.3)
     axes[0, 0].legend()
-    fig.suptitle("Semantic SLAM aggregate results (95% CI across environments)")
+    fig.suptitle(
+        "Actual-class diversity with a fixed five-class belief "
+        "(95% CI across environments)"
+    )
     fig.tight_layout()
     fig.savefig(output_path, dpi=300)
     plt.close(fig)
@@ -180,7 +200,7 @@ def plot_paired_difference(paired_rows, output_path):
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.axhline(0.0, color="black", linewidth=1)
     ax.errorbar(classes, means, yerr=cis, fmt="o-", capsize=5, linewidth=2)
-    ax.set_xlabel("Candidate classes (M)")
+    ax.set_xlabel("Actual classes present (M)")
     ax.set_ylabel("Paired final-error difference (semantic − geometric), m")
     ax.set_xticks(classes)
     ax.grid(alpha=0.3)
@@ -194,13 +214,16 @@ def write_report(rows, paired_rows, expected_environments, expected_trials, outp
     lookup = {(row["M"], row["mode"]): row for row in rows}
     total_recoveries = sum(row["visibility_recoveries"] for row in rows)
     maximum_trial_time = max(row["trial_time_max_s"] for row in rows)
+    environment_word = "environment" if expected_environments == 1 else "environments"
     lines = [
         "# Results Analysis",
         "",
-        f"The completed study contains {expected_environments} environments, "
-        f"{expected_trials} trials per environment, five class counts, and two inference modes "
-        f"({expected_environments * expected_trials * 5 * 2:,} trial experiments). "
-        "Confidence intervals below use the environment mean as the independent unit (n=20).",
+        f"The completed study contains {expected_environments} {environment_word}, "
+        f"{expected_trials} trials per environment, five actual scene-class counts, and two inference modes "
+        f"({expected_environments * expected_trials * len(paired_rows) * 2:,} trial experiments). "
+        "M is the number of distinct ground-truth classes present; every estimator belief "
+        "models five candidate classes. Confidence intervals below use the environment mean "
+        f"as the independent unit (n={expected_environments}).",
         "",
         "## Final pose error",
         "",
@@ -219,11 +242,11 @@ def write_report(rows, paired_rows, expected_environments, expected_trials, outp
             f"{paired['percent_reduction']:+.1f}% |"
         )
 
-    supported = [
+    supported = [] if expected_environments < 2 else [
         row["M"] for row in paired_rows
         if row["difference_mean"] + row["difference_ci95"] < 0.0
     ]
-    adverse = [
+    adverse = [] if expected_environments < 2 else [
         row["M"] for row in paired_rows
         if row["difference_mean"] - row["difference_ci95"] > 0.0
     ]
@@ -254,8 +277,8 @@ def write_report(rows, paired_rows, expected_environments, expected_trials, outp
             "",
             "The intervals describe variation among these synthetic environments and do not establish "
             "generalization to real classifiers or scenes. The estimator uses EKF components, "
-            "factor-by-factor pruning, and a top-100 beam cap; M>2 uses a symmetric extension of the "
-            "paper's two-class semantic model. Runtime measurements also include ordinary host-load "
+            "factor-by-factor pruning, and a top-100 beam cap. Its fixed five-class likelihood is a "
+            "symmetric extension of the paper's two-class semantic model. Runtime measurements also include ordinary host-load "
             "variation and should be read as implementation diagnostics rather than asymptotic evidence.",
             "",
         ]
@@ -265,8 +288,8 @@ def write_report(rows, paired_rows, expected_environments, expected_trials, outp
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data-dir", default="results/data_v8")
-    parser.add_argument("--output-dir", default="results")
+    parser.add_argument("--data-dir", default="results/data_v9")
+    parser.add_argument("--output-dir", default="results/v9")
     parser.add_argument("--expected-environments", type=int, default=20)
     parser.add_argument("--expected-trials", type=int, default=50)
     args = parser.parse_args()
