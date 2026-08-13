@@ -97,7 +97,38 @@ The local review bundle is in `results/milkjug_full/` and contains:
 - `v8_full_experiment.log`.
 
 Generated results are intentionally gitignored because the raw dataset and
-figures are reproducible artifacts rather than source files.
+logs are reproducible artifacts rather than source files. The final PNG figures
+are committed for direct review on GitHub.
+
+## Figure gallery
+
+### Aggregate results
+
+![Final error, DA entropy, active hypotheses, and runtime across candidate class counts](results/milkjug_full/aggregate_results.png)
+
+### Paired semantic effect
+
+![Paired final-error difference between viewpoint-dependent and geometric-only inference](results/milkjug_full/paired_pose_error_difference.png)
+
+### Accuracy and tractability
+
+![Accuracy versus candidate class count](results/milkjug_full/accuracy_vs_num_classes.png)
+
+![Class scaling and tractability summary](results/milkjug_full/tractability_table_graph.png)
+
+### Uncertainty over time
+
+![Data-association entropy over time](results/milkjug_full/da_entropy_comparison_all_M.png)
+
+![Robot position-covariance determinant over time](results/milkjug_full/pose_covariance_det_comparison_all_M.png)
+
+### Trajectories
+
+- [M=1 trajectory panel](results/milkjug_full/trajectory_visualization_M1.png)
+- [M=2 trajectory panel](results/milkjug_full/trajectory_visualization_M2.png)
+- [M=3 trajectory panel](results/milkjug_full/trajectory_visualization_M3.png)
+- [M=4 trajectory panel](results/milkjug_full/trajectory_visualization_M4.png)
+- [M=5 trajectory panel](results/milkjug_full/trajectory_visualization_M5.png)
 
 To benchmark one production-sized trial for every class count and mode:
 
