@@ -2,6 +2,7 @@ import os
 import json
 import subprocess
 import hashlib
+import glob
 from pathlib import Path
 import numpy as np
 from datetime import datetime
@@ -14,6 +15,11 @@ class VersionedDataStore:
     """
 
     VERSION = "v8.0.0"
+    # f9043c2 results that completed successfully never exercised the new
+    # visibility-collapse recovery and are therefore numerically unchanged.
+    # Reuse those exact checkpoints so a repaired run resumes at env/M rather
+    # than discarding hours of completed computation.
+    COMPATIBLE_SOURCE_FINGERPRINTS = {"bef21a006773792f"}
 
     def __init__(self, base_dir: str = "results/data_v8"):
         self.base_dir = os.path.abspath(base_dir)
@@ -56,7 +62,32 @@ class VersionedDataStore:
 
     def exists(self, env_id: int, num_classes: int, num_trials: int, config_dict: dict) -> bool:
         filepath = self._get_filename(env_id, num_classes, num_trials, config_dict)
-        return os.path.exists(filepath)
+        return os.path.exists(filepath) or self._find_compatible_file(
+            env_id, num_classes, num_trials, config_dict
+        ) is not None
+
+    def _find_compatible_file(self, env_id: int, num_classes: int, num_trials: int, config_dict: dict) -> Optional[str]:
+        """Find a narrowly allow-listed checkpoint with the exact same config."""
+        pattern = os.path.join(
+            self.base_dir,
+            f"env_{env_id:02d}_M{num_classes}_trials{num_trials}_*_{self.VERSION}.json",
+        )
+        for filepath in sorted(glob.glob(pattern)):
+            try:
+                with open(filepath, "r") as handle:
+                    metadata = json.load(handle)["metadata"]
+            except (OSError, KeyError, TypeError, json.JSONDecodeError):
+                continue
+            if (
+                metadata.get("version") == self.VERSION
+                and metadata.get("source_fingerprint") in self.COMPATIBLE_SOURCE_FINGERPRINTS
+                and metadata.get("env_id") == env_id
+                and metadata.get("num_candidate_classes") == num_classes
+                and metadata.get("num_trials") == num_trials
+                and metadata.get("config") == config_dict
+            ):
+                return filepath
+        return None
 
     def save(self, env_id: int, num_classes: int, num_trials: int, env_objects: list, results: dict, config_dict: dict):
         filepath = self._get_filename(env_id, num_classes, num_trials, config_dict)
@@ -99,7 +130,11 @@ class VersionedDataStore:
     def load(self, env_id: int, num_classes: int, num_trials: int, config_dict: dict) -> Optional[dict]:
         filepath = self._get_filename(env_id, num_classes, num_trials, config_dict)
         if not os.path.exists(filepath):
-            return None
+            filepath = self._find_compatible_file(
+                env_id, num_classes, num_trials, config_dict
+            )
+            if filepath is None:
+                return None
 
         with open(filepath, "r") as f:
             payload = json.load(f)

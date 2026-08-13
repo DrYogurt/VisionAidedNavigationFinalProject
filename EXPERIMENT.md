@@ -91,8 +91,10 @@ space studied by the paper.
 
 The conclusions are limited by the EKF continuous-state approximation,
 factor-by-factor threshold pruning within multi-detection time steps, the
-synthetic sensor and visibility models, finite Monte Carlo sampling, and the
-symmetric multiclass extension, which is not an empirical classifier supplied
+synthetic sensor and visibility models, finite Monte Carlo sampling, the rare
+recorded visibility-gate recovery used when all retained Monte Carlo support
+collapses for one observation, and the symmetric multiclass extension, which
+is not an empirical classifier supplied
 by the original paper. The Equation 18 comparison is exact only for two
 classes; results for $M>2$ evaluate the stated extension. A future study could
 use incremental factor-graph smoothing, real calibrated classifier data, and

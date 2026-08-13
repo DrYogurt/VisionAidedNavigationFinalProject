@@ -90,6 +90,7 @@ def _run_trial(
         "num_hypotheses": np.zeros(config.num_steps + 1),
         "step_time": np.zeros(config.num_steps),
         "trial_time": np.zeros(1),
+        "visibility_recoveries": np.zeros(1),
         "est_trajectories": np.zeros((config.num_steps + 1, 3)),
     }
 
@@ -140,6 +141,7 @@ def _run_trial(
         )
 
     result["trial_time"][0] = time.perf_counter() - trial_start_time
+    result["visibility_recoveries"][0] = engine.visibility_recoveries
     return mode, trial_idx, result
 
 class ExperimentRunner:
@@ -193,6 +195,7 @@ class ExperimentRunner:
                 "num_hypotheses": np.zeros((self.config.num_trials, self.config.num_steps + 1)),
                 "step_time": np.zeros((self.config.num_trials, self.config.num_steps)),
                 "trial_time": np.zeros((self.config.num_trials, 1)),
+                "visibility_recoveries": np.zeros((self.config.num_trials, 1)),
                 "est_trajectories": np.zeros((self.config.num_trials, self.config.num_steps + 1, 3)),
             }
 

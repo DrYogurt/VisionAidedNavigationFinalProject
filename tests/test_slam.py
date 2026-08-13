@@ -175,5 +175,28 @@ class TestSemanticSLAM(unittest.TestCase):
             beta_vector = hypothesis.da_history[-1]
             self.assertEqual(len(beta_vector), len(set(beta_vector)))
 
+    def test_visibility_sample_collapse_uses_measurement_recovery(self):
+        config = EnvironmentConfig(
+            num_objects=1,
+            num_classes_in_model=1,
+            num_samples=20,
+            sensor_range=100.0,
+            sigma_p=np.diag([0.01, 0.01, 0.01]),
+        )
+        env = Environment(config, seed=23)
+        engine = SemanticSLAMEngine(config, env.objects, mode="geometric_only")
+        engine._batch_visibility = lambda robot_poses, obj_poses: np.zeros(len(robot_poses))
+        obj = env.objects[0]
+        z_geo = engine.geo_model.observe(config.initial_robot_pose, obj.gt_pose)
+
+        engine.step(
+            np.zeros(3),
+            [(obj.id, z_geo, np.ones(1))],
+            np.random.default_rng(23),
+        )
+
+        self.assertTrue(engine.hypotheses)
+        self.assertEqual(engine.visibility_recoveries, 1)
+
 if __name__ == "__main__":
     unittest.main()

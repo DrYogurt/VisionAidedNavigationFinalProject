@@ -79,6 +79,11 @@ class SemanticSLAMEngine:
             raise ValueError(f"unknown inference mode: {mode}")
 
         self.hypotheses: List[HypothesisComponent] = []
+        # Counts rare beam/Monte-Carlo support collapses where the hard
+        # visibility gate rejects every candidate for an observation.  In
+        # that case the measurement likelihood is used without the gate so
+        # the filter can recover instead of terminating the whole study.
+        self.visibility_recoveries = 0
         self._initialize_beliefs()
 
     def _initialize_beliefs(self):
@@ -140,6 +145,7 @@ class SemanticSLAMEngine:
         working = [(comp, tuple()) for comp in self.hypotheses]
         for _landmark_gt_id, z_geo, z_sem in observations:
             next_working = []
+            visibility_fallback = []
             candidate_betas = list(range(self.num_objects))
 
             for comp, beta_prefix in working:
@@ -160,9 +166,19 @@ class SemanticSLAMEngine:
                         class_options = [(class_m, class_prior) for class_m in range(self.num_classes)]
 
                     for class_m, class_prior in class_options:
-                        psi = self._prop_weights_sampling(
+                        psi, measurement_psi = self._prop_weights_sampling(
                             comp, beta_k, z_geo, z_sem, class_m, rng
                         )
+                        target = next_working
+                        if psi <= 0.0 or not np.isfinite(psi):
+                            # The hard visibility indicator is estimated with
+                            # finite samples. Beam pruning can leave no sample
+                            # inside that indicator even though the observed
+                            # geometric/semantic measurement has finite
+                            # support. Keep these candidates only as a
+                            # last-resort recovery set for this factor.
+                            psi = measurement_psi
+                            target = visibility_fallback
                         if psi <= 0.0 or not np.isfinite(psi):
                             continue
 
@@ -177,10 +193,13 @@ class SemanticSLAMEngine:
                             cov=comp.cov,
                         )
                         self._ekf_update(new_comp, beta_k, z_geo, z_sem)
-                        next_working.append((new_comp, beta_prefix + (beta_k,)))
+                        target.append((new_comp, beta_prefix + (beta_k,)))
 
             if not next_working:
-                raise RuntimeError("all hypotheses received zero observation likelihood")
+                if not visibility_fallback:
+                    raise RuntimeError("all hypotheses received zero measurement likelihood")
+                next_working = visibility_fallback
+                self.visibility_recoveries += 1
 
             # Incremental threshold pruning keeps the Python implementation
             # tractable for multi-detection steps. With pruning disabled this
@@ -218,7 +237,7 @@ class SemanticSLAMEngine:
                               z_geo: np.ndarray,
                               z_sem: np.ndarray,
                               class_m: int,
-                              rng: np.random.Generator) -> float:
+                              rng: np.random.Generator) -> Tuple[float, float]:
         """
         Procedure PROPWEIGHTS:
         Vectorized sampling of Ns poses {x_k^(i), X_{beta_k}^{o(i)}} from continuous belief b^-[x_k, X_{beta_k}^o]
@@ -249,9 +268,10 @@ class SemanticSLAMEngine:
             l_sem = np.ones(N_s)
 
         visible = self._batch_visibility(robot_samples, obj_samples)
-        likelihoods = l_geo * l_sem * visible
-        psi = float(np.mean(likelihoods))
-        return psi
+        measurement_likelihoods = l_geo * l_sem
+        gated_psi = float(np.mean(measurement_likelihoods * visible))
+        measurement_psi = float(np.mean(measurement_likelihoods))
+        return gated_psi, measurement_psi
 
     def _batch_visibility(self, robot_poses: np.ndarray, obj_poses: np.ndarray) -> np.ndarray:
         """Object-observation factor P(beta_k | x_k, X^o_beta_k)."""

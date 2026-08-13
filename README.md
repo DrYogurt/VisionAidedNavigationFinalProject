@@ -36,6 +36,10 @@ relative-weight pruning and bounds per-trial runtime. Pass `--max-hypotheses 0`
 only for uncapped research runs; ambiguous six-object cases can otherwise grow
 too large to finish. Corrected outputs are cached under `results/data_v8`; the
 cache identity includes the full configuration and a source-code fingerprint.
+If finite-sample beam pruning leaves no candidate inside the hard visibility
+gate, the engine records a `visibility_recoveries` event and falls back to the
+finite geometric/semantic measurement likelihood for that observation. This
+prevents a rare particle-support collapse from aborting a multi-hour study.
 
 Run the dependency-free test suite with:
 
