@@ -48,9 +48,10 @@ assignments are `[0,0,0,0,0,0]`, `[0,1,0,1,0,1]`,
 The full v9 design uses 20 independently seeded environments, 50 tracks per
 environment, 10 timesteps per track, six objects, 1,000 Monte Carlo samples,
 five actual class counts, and two inference modes. This yields 10,000 trial
-experiments. Independent `(mode, trial)` jobs run in two worker processes with
-fixed random seeds. Completed `(environment, M)` blocks are stored in the
-incompatible v9 cache so no v8 result can be loaded accidentally.
+experiments. Independent `(mode, trial)` jobs use fixed random seeds. The worker
+count is configurable; the current full run on `milkjug` uses eight worker
+processes. Completed `(environment, M)` blocks are stored in the incompatible
+v9 cache so no v8 result can be loaded accidentally.
 
 The hard visibility factor can rarely lose all retained Monte Carlo support.
 When all gated candidates for an observation are zero but the measurement
