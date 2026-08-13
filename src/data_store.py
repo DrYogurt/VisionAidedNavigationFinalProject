@@ -15,11 +15,13 @@ class VersionedDataStore:
     """
 
     VERSION = "v8.0.0"
-    # f9043c2 results that completed successfully never exercised the new
-    # visibility-collapse recovery and are therefore numerically unchanged.
-    # Reuse those exact checkpoints so a repaired run resumes at env/M rather
-    # than discarding hours of completed computation.
-    COMPATIBLE_SOURCE_FINGERPRINTS = {"bef21a006773792f"}
+    # Reuse exact-config checkpoints across narrowly audited source changes:
+    # the first entry predates the recovery but only contains jobs that never
+    # exercised it; the second differs from current source only in plot layout.
+    COMPATIBLE_SOURCE_FINGERPRINTS = {
+        "bef21a006773792f",  # bounded run before visibility recovery
+        "51e1bdab2664c353",  # completed repaired run before plot-only layout fix
+    }
 
     def __init__(self, base_dir: str = "results/data_v8"):
         self.base_dir = os.path.abspath(base_dir)

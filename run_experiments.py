@@ -221,8 +221,8 @@ def plot_metrics_per_m(multi_env_data: dict, output_dir: str):
         ax.grid(True, linestyle="--", alpha=0.5)
         ax.legend(fontsize=9)
 
-    plt.suptitle("DA Ambiguity H(w) over Time Across Environments (M=1..5)", y=1.03, fontsize=14)
-    plt.tight_layout()
+    plt.suptitle("DA Ambiguity H(w) over Time Across Environments (M=1..5)", y=0.98, fontsize=14)
+    plt.tight_layout(rect=[0, 0, 1, 0.92])
     plt.savefig(os.path.join(output_dir, "da_entropy_comparison_all_M.png"), dpi=300)
     plt.close()
 
@@ -249,8 +249,8 @@ def plot_metrics_per_m(multi_env_data: dict, output_dir: str):
         ax.grid(True, linestyle="--", alpha=0.5)
         ax.legend(fontsize=9)
 
-    plt.suptitle("Localization Uncertainty det(Σ) Across Environments (M=1..5)", y=1.03, fontsize=14)
-    plt.tight_layout()
+    plt.suptitle("Localization Uncertainty det(Σ) Across Environments (M=1..5)", y=0.98, fontsize=14)
+    plt.tight_layout(rect=[0, 0, 1, 0.92])
     plt.savefig(os.path.join(output_dir, "pose_covariance_det_comparison_all_M.png"), dpi=300)
     plt.close()
 
