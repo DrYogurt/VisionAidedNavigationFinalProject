@@ -55,6 +55,17 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
 python benchmark_runtime.py --max-seconds 300
 ```
 
+After all 100 environment/class checkpoints finish, generate an aggregate CSV,
+paired analysis, Markdown report, and publication figures with:
+
+```bash
+python analyze_results.py
+```
+
+Confidence intervals in this post-processing step use the 20 environment means
+as independent units rather than treating the 1,000 correlated trials as
+independent replicates.
+
 ## Scope and provenance
 
 The continuous belief uses one EKF per discrete hypothesis rather than the
